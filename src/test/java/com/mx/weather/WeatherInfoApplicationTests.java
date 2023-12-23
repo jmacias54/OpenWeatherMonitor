@@ -1,10 +1,10 @@
-package com.mx.openweathermap.monitor;
+package com.mx.weather;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 
 @SpringBootTest
-class OpenWeatherMonitorApplicationTests {
+class WeatherInfoApplicationTests {
 
 	@Test
 	void contextLoads() {
