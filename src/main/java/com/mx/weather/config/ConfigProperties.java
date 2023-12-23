@@ -9,6 +9,6 @@ import org.springframework.context.annotation.Configuration;
 public class ConfigProperties {
 
 	
-	@Value("${weather.api.url}")
-	private String awsUrl;
+	@Value("${weather.api.token}")
+	private String openWeatherMapToken;
 }

@@ -17,12 +17,6 @@ public class MatrixOperationsController {
 
 	private final MatrixService matrixService;
 
-	@GetMapping("/hello")
-	@ApiOperation("Get a greeting message")
-	public String hello() {
-		return "Hello, World!";
-	}
-
 	@PostMapping(path = "/multiply", consumes = MediaType.APPLICATION_JSON_VALUE)
 	public ResponseEntity<MatrixResponse> multiply(@RequestBody MatrixRequest request) {
 		return ResponseEntity.ok(this.matrixService.multiplyMatrices(request));

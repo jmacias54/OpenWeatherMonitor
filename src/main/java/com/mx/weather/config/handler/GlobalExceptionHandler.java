@@ -5,12 +5,22 @@ import com.mx.weather.exception.ItemNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.TypeMismatchException;
 import org.springframework.context.MessageSource;
 import org.springframework.context.NoSuchMessageException;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
+import org.springframework.http.*;
+import org.springframework.validation.BindException;
+import org.springframework.validation.FieldError;
+import org.springframework.validation.ObjectError;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
+import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.context.request.WebRequest;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
+import org.springframework.web.servlet.NoHandlerFoundException;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
 import javax.servlet.http.HttpServletRequest;
@@ -65,6 +75,174 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 		return new ResponseEntity<>(responseError, HttpStatus.OK);
 	}
 
+	@Override
+	protected ResponseEntity<Object> handleMethodArgumentNotValid(
+		MethodArgumentNotValidException ex,
+		HttpHeaders headers, HttpStatus status, WebRequest request
+	) {
+
+		logger.error("handleMethodArgumentNotValid Occured:: URL ");
+		logger.error("Error detail:: ", ex.getMessage());
+
+		imprimeError(ex);
+		final List<String> errors = new ArrayList<>();
+		for(final FieldError error : ex.getBindingResult().getFieldErrors()) {
+			errors.add(error.getDefaultMessage());
+		}
+		for(final ObjectError error : ex.getBindingResult().getGlobalErrors()) {
+			errors.add(error.getDefaultMessage());
+		}
+
+		Error body = createResponseError(ARGS_NOT_VALID, errors);
+
+		return handleExceptionInternal(ex, body, headers, HttpStatus.BAD_REQUEST, request);
+	}
+
+	@Override
+	protected ResponseEntity<Object> handleBindException(
+		BindException ex, HttpHeaders headers, HttpStatus status,
+		WebRequest request
+	) {
+
+		logger.error("handleBindException Occured:: URL ");
+		logger.error("Error detail:: ", ex.getMessage());
+		imprimeError(ex);
+		final List<String> errors = new ArrayList<>();
+		for(final FieldError error : ex.getBindingResult().getFieldErrors()) {
+			errors.add(error.getDefaultMessage());
+		}
+		for(final ObjectError error : ex.getBindingResult().getGlobalErrors()) {
+			errors.add(error.getDefaultMessage());
+		}
+
+		Error body = createResponseError(BIND_EXCEPTION, errors);
+
+		return handleExceptionInternal(ex, body, headers, HttpStatus.BAD_REQUEST, request);
+	}
+
+	@Override
+	protected ResponseEntity<Object> handleTypeMismatch(
+		TypeMismatchException ex, HttpHeaders headers,
+		HttpStatus status, WebRequest request
+	) {
+
+		logger.error("handleTypeMismatch Occured:: URL ");
+		logger.error("Error detail:: ", ex.getMessage());
+		imprimeError(ex);
+
+		String error = " The entered value => " + (isNull(ex.getValue()) ? "'UNKNOWN'" : ex.getValue())
+			+ " is a property of type => " + (isNull(ex.getPropertyName()) ? "'UNKNOWN'" : ex.getPropertyName()) + " ,the correct type to enter is => "
+			+ ex.getRequiredType();
+
+		Error body = createResponseError(TYPE_MISMATCH, Arrays.asList(error));
+
+		return handleExceptionInternal(ex, body, headers, HttpStatus.BAD_REQUEST, request);
+	}
+
+	@Override
+	protected ResponseEntity<Object> handleMissingServletRequestPart(
+		MissingServletRequestPartException ex,
+		HttpHeaders headers, HttpStatus status, WebRequest request
+	) {
+
+		logger.error("handleMissingServletRequestPart Occured:: URL ");
+		logger.error("Error detail:: ", ex.getMessage());
+		imprimeError(ex);
+		final String error = ex.getRequestPartName() + " missing part.";
+
+		Error body = createResponseError(MISSING_SERVLET_REQ_PART, Arrays.asList(error));
+
+		return handleExceptionInternal(ex, body, headers, HttpStatus.BAD_REQUEST, request);
+	}
+
+	@Override
+	protected ResponseEntity<Object> handleMissingServletRequestParameter(
+		MissingServletRequestParameterException ex,
+		HttpHeaders headers, HttpStatus status, WebRequest request
+	) {
+
+		logger.error("handleMissingServletRequestParameter Occured:: URL ");
+		logger.error("Error detail:: ", ex.getMessage());
+		imprimeError(ex);
+		final String error = ex.getParameterName() + " missing parameter.";
+
+		Error body = createResponseError(MISSING_SERVLET_REQ_PARAM, Arrays.asList(error));
+
+		return handleExceptionInternal(ex, body, headers, HttpStatus.BAD_REQUEST, request);
+	}
+
+	// 404
+	@Override
+	protected ResponseEntity<Object> handleNoHandlerFoundException(
+		NoHandlerFoundException ex, HttpHeaders headers,
+		HttpStatus status, WebRequest request
+	) {
+
+		logger.error("handleNoHandlerFoundException Occured:: URL ");
+		logger.error("Error detail:: ", ex.getMessage());
+		imprimeError(ex);
+		final String error = " No service found for " + ex.getHttpMethod() + " " + ex.getRequestURL();
+
+		Error body = createResponseError(NO_HANDLER_FOUND_EXCEPTION, Arrays.asList(error));
+
+		return handleExceptionInternal(ex, body, headers, HttpStatus.NOT_FOUND, request);
+	}
+
+	// 405 - method is not supported for this request. Supported methods are
+	@Override
+	protected ResponseEntity<Object> handleHttpRequestMethodNotSupported(
+		HttpRequestMethodNotSupportedException ex,
+		HttpHeaders headers, HttpStatus status, WebRequest request
+	) {
+		logger.error("handleHttpRequestMethodNotSupported Occured:: URL ");
+		logger.error("Error detail:: ", ex.getMessage());
+		imprimeError(ex);
+		final StringBuilder builder = new StringBuilder();
+		builder.append(ex.getMethod());
+		builder.append(" The method is not compatible with this request. The allowed methods are ");
+		for(HttpMethod httpMethod : ex.getSupportedHttpMethods()) {
+			builder.append(httpMethod + ", ");
+		}
+
+		HttpRequestMethodNotSupportedException exa = new HttpRequestMethodNotSupportedException(
+			request.getHeader("accept"), String.valueOf(ex.getSupportedHttpMethods()));
+		Error body = createResponseError(REQ_METHOD_NOT_SUPPORTED, Arrays.asList(builder.toString()));
+
+		return handleExceptionInternal(exa, body, headers, HttpStatus.METHOD_NOT_ALLOWED, request);
+
+	}
+
+	// 415
+	@Override
+	protected ResponseEntity<Object> handleHttpMediaTypeNotSupported(
+		HttpMediaTypeNotSupportedException ex,
+		HttpHeaders headers, HttpStatus status, WebRequest request
+	) {
+
+		logger.error("handleHttpMediaTypeNotSupported Occured:: URL ");
+		logger.error("Error detail:: ", ex.getMessage());
+		imprimeError(ex);
+
+		final StringBuilder builder = new StringBuilder();
+		builder.append(ex.getContentType());
+		builder.append(" Media type is not supported. Supported media types are ");
+		for(MediaType mediaType : ex.getSupportedMediaTypes()) {
+			builder.append(mediaType + ", ");
+		}
+
+		MediaType mediaType = MediaType.parseMediaType(request.getHeader("accept"));
+		HttpMediaTypeNotSupportedException exa = new HttpMediaTypeNotSupportedException(
+			mediaType,
+			ex.getSupportedMediaTypes()
+		);
+		headers.setAccept(ex.getSupportedMediaTypes());
+		Error body = createResponseError(
+			MEDIA_TYPE_NOT_SUPPORTED,
+			Arrays.asList(builder.substring(0, builder.length() - 2))
+		);
+
+		return handleExceptionInternal(exa, body, headers, HttpStatus.UNSUPPORTED_MEDIA_TYPE, request);
+	}
 
 	private Error createResponseError(String httpStatusStr, List<String> errors) {
 
